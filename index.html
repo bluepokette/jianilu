@@ -76,6 +76,7 @@
       justify-content: center;
       padding-top: 44px;
       padding-bottom: 56px;
+      overflow: hidden;
     }
 
     /* Image stage */
@@ -86,30 +87,34 @@
       justify-content: center;
       flex: 1;
       width: 100%;
-      cursor: none;
+      min-height: 0;
     }
 
-    /* Placeholder image */
+    /* Slide wrapper */
     .slide-wrap {
       position: relative;
       display: flex;
       align-items: center;
       justify-content: center;
+      max-width: 100%;
+      max-height: 100%;
     }
 
     .placeholder-outer {
-      background: #f2f2f2;
-      padding: 18px;
+      background: transparent;
+      padding: 0;
       display: flex;
       align-items: center;
       justify-content: center;
+      flex-shrink: 0;
     }
 
     .placeholder-inner {
       position: relative;
-      border: 1.5px solid #555;
+      border: 1px solid #ccc;
       background: #fff;
       overflow: hidden;
+      flex-shrink: 0;
     }
 
     .placeholder-inner svg {
@@ -139,16 +144,21 @@
     .cursor-half.left  { left: 0; cursor: w-resize; }
     .cursor-half.right { right: 0; cursor: e-resize; }
 
-    /* Caption */
+    /* Caption — always fixed to bottom, respects nav margins */
     .caption {
       position: fixed;
       bottom: 18px;
-      left: 0; right: 0;
+      left: 18px;
+      right: 18px;
       text-align: center;
       font-size: 10px;
       color: var(--mid);
       pointer-events: none;
       line-height: 1.4;
+    }
+
+    @media (max-width: 680px) {
+      .caption { text-align: left; }
     }
 
     .caption .fig-num   { margin-right: 6px; }
@@ -272,6 +282,7 @@
 
     /* ── MOBILE ── */
     @media (max-width: 680px) {
+      /* About page */
       #about-view {
         padding: 48px 0 40px;
         overflow-y: auto;
@@ -394,62 +405,60 @@
   let current = 0;
 
   function getDims(aspect) {
-    // target a large-ish viewport-fit image
-    const maxH = window.innerHeight - 44 - 56 - 36 - 36; // header + caption + padding
-    const maxW = window.innerWidth - 72;
+    const margin = 18 * 2; // match nav margins
+    const maxW = window.innerWidth - margin;
+    const maxH = window.innerHeight - 44 - 56 - 36; // header + caption + gap
 
+    let w, h;
     if (aspect === 'portrait') {
-      const h = Math.min(maxH, 620);
-      const w = Math.round(h * 0.62);
-      return { w: Math.min(w, maxW), h };
+      h = Math.min(maxH, 700);
+      w = Math.round(h * 0.75);
+      if (w > maxW) { w = maxW; h = Math.round(w / 0.75); }
     } else if (aspect === 'landscape') {
-      const w = Math.min(maxW, 900);
-      const h = Math.round(w * 0.52);
-      return { w, h: Math.min(h, maxH) };
+      w = maxW;
+      h = Math.round(w * 0.67);
+      if (h > maxH) { h = maxH; w = Math.round(h / 0.67); }
     } else {
-      const s = Math.min(maxH, maxW, 580);
-      return { w: s, h: s };
+      const s = Math.min(maxH, maxW);
+      w = s; h = s;
     }
+    return { w, h };
   }
 
   function renderSlide() {
     const s = slides[current];
-    const { w, h } = getDims(s.aspect);
     const total = slides.length;
+    const { w, h } = getDims(s.aspect);
 
     const wrap = document.getElementById('slide-wrap');
     wrap.innerHTML = '';
 
+    // Outer: no grey, no padding — just a transparent sized container
     const outer = document.createElement('div');
     outer.className = 'placeholder-outer';
-    outer.style.width  = (w + 36) + 'px';
-    outer.style.height = (h + 36) + 'px';
+    outer.style.cssText = `width:${w}px;height:${h}px;`;
 
     const inner = document.createElement('div');
     inner.className = 'placeholder-inner';
-    inner.style.width  = w + 'px';
-    inner.style.height = h + 'px';
+    inner.style.cssText = `width:100%;height:100%;border:1px solid #ccc;`;
 
     if (s.img) {
-      // Real image
-      inner.style.border = 'none';
+      inner.style.border   = '1px solid #ccc';
       inner.style.overflow = 'hidden';
       inner.innerHTML = `<img src="${s.img}" alt="${s.title}"
-        style="width:100%;height:100%;object-fit:cover;display:block;" />`;
+        style="display:block;width:100%;height:100%;object-fit:contain;background:#fff;" />`;
     } else {
-      // Placeholder
       inner.innerHTML = `
         <svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
           <line x1="0" y1="0" x2="${w}" y2="${h}" stroke="#ccc" stroke-width="1"/>
         </svg>
-        <span class="placeholder-label">Cargo® Placeholder Image · cargo.site</span>
+        <span class="placeholder-label">Placeholder</span>
       `;
     }
 
     outer.appendChild(inner);
     wrap.appendChild(outer);
 
-    // caption
     const cap = document.getElementById('caption');
     cap.innerHTML = `
       <span class="fig-num">Fig. ${s.fig} of ${String(total).padStart(2,'0')}</span>
@@ -457,7 +466,6 @@
       ${s.desc}, ${s.year}
     `;
 
-    // re-animate
     wrap.style.animation = 'none';
     void wrap.offsetWidth;
     wrap.style.animation = '';
